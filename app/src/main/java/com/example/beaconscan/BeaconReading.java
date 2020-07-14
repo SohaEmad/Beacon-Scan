@@ -8,6 +8,7 @@ public class BeaconReading {
     private String uuid;
     private int rssi;
 
+
     public BeaconReading(List<Identifier> identifiers, int rssi) {
         this.uuid = generateID(identifiers);
         this.rssi = rssi;

@@ -1,180 +1,192 @@
 package com.example.beaconscan;
 
 //import android.support.v4.content.LocalBroadcastManager;
+
 import android.Manifest;
 import android.annotation.TargetApi;
 import android.app.Activity;
 import android.content.DialogInterface;
+import android.content.Intent;
 import android.content.pm.PackageManager;
+import android.net.Uri;
 import android.os.Build;
 import android.os.Bundle;
 import android.os.CountDownTimer;
 import android.os.RemoteException;
 import android.util.Log;
 import android.view.View;
+import android.widget.ArrayAdapter;
 import android.widget.Button;
+import android.widget.ListView;
+import android.widget.ProgressBar;
 import android.widget.TextView;
-import android.widget.Toast;
 
-import androidx.appcompat.app.AlertDialog;
-
-import org.altbeacon.beacon.Beacon;
-import org.altbeacon.beacon.BeaconConsumer;
-import org.altbeacon.beacon.BeaconManager;
-import org.altbeacon.beacon.BeaconParser;
-import org.altbeacon.beacon.RangeNotifier;
-import org.altbeacon.beacon.Region;
+import androidx.core.app.ShareCompat;
+import androidx.core.content.FileProvider;
 
 import java.io.File;
 import java.io.FileOutputStream;
 import java.io.IOException;
 import java.io.OutputStreamWriter;
-import java.util.Collection;
+import java.text.SimpleDateFormat;
+import java.util.ArrayList;
+import java.util.Calendar;
+import java.util.Date;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
 
-public class MainActivity  extends Activity implements  BeaconReadingsProvider.BeaconReadingsListener {
+import static android.content.Intent.FLAG_ACTIVITY_NEW_TASK;
+
+public class MainActivity extends Activity implements BeaconReadingsProvider.BeaconReadingsListener {
 
     Button start;
     protected static final String TAG = "RangingActivity";
     private BeaconReadingsProvider beaconReadingsProvider;
+    private ListView list;
     private static final int PERMISSION_REQUEST_FINE_LOCATION = 1;
     private static final int PERMISSION_REQUEST_BACKGROUND_LOCATION = 2;
-TextView Timer;
-int counter =0 ;
+    private double expermintSteps[] = {0.25, 0.5, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 12, 14, 16, 18, 20, 25, 30, 40};
+    Date currentTime = Calendar.getInstance().getTime();
+    int[][] readingsArray = new int[20][3];
+    List<String> data = new ArrayList<>();
+    String[] array;
+    String item;
+    TextView Timer;
+    int counter = 0;
+    int steps = 0;
+    ArrayAdapter<String> adapter;
+     CountDownTimer countDownTimer;
+    ProgressBar simpleProgressBar;
+    Button share;
+
+ File file;
+    String name = Build.MODEL;
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_main);
 
+        file = new File("/sdcard/Download/", name+".csv");
         start = findViewById(R.id.start);
-        Timer= (TextView) findViewById(R.id.timer);
-//        checkPermision();
+        Timer = findViewById(R.id.timer);
+        list = findViewById(R.id.list);
+       simpleProgressBar= findViewById(R.id.experimentProgress); // initiate the progress bar
+share = findViewById(R.id.share);
+        simpleProgressBar.setMax(expermintSteps.length);
+  start.setText("calculate RSSI on  " + expermintSteps[0] + " meter");
         beaconReadingsProvider = new BeaconReadingsProvider(this, this);
 
+         adapter = new ArrayAdapter<String>(this, android.R.layout.simple_list_item_1, android.R.id.text1, data);
+        list.setAdapter(adapter);
         start.setOnClickListener(new View.OnClickListener() {
             @Override
             public void onClick(View v) {
-                beaconReadingsProvider.startUpdating();
-                new CountDownTimer(30000, 1000) {
-                    public void onTick(long millisUntilFinished) {
-                        Timer.setText(String.valueOf(counter));
-                        counter++;
+                System.out.println("the couneter value is " + steps);
+                if (steps < expermintSteps.length) {
+                    beaconReadingsProvider.startUpdating(System.currentTimeMillis());
+                    start.setEnabled(false);
+                    countDown();
+                    steps++;
+                } else if (steps == expermintSteps.length-1) {
 
-                    }
+                    beaconReadingsProvider.startUpdating(  System.currentTimeMillis());
+                    countDown();
+                    writeLog();
+                } else {
+                    start.setText("Start experiment again");
+                    steps = 0;
+                    onClick(v);
+                }
+simpleProgressBar.setProgress(steps);
 
-                    public void onFinish() {
-                        Timer.setText("FINISH!!");
-                        beaconReadingsProvider.stopUpdating();
-                        counter =0 ;
+    }
+        });
 
-                    }
-                }.start();
-            }
+        share.setOnClickListener(new View.OnClickListener(){
+
+            @Override
+            public void onClick(View v) {
+                Intent shareIntent = new Intent(Intent.ACTION_SEND);
+                shareIntent.setType("text/comma_separated_values/csv");// You Can set source type here like video, image text, etc.
+                shareIntent.putExtra(Intent.EXTRA_STREAM, Uri.parse("sdcard/Download/"+name+".csv"));
+                shareIntent.setFlags(FLAG_ACTIVITY_NEW_TASK);
+                startActivity(Intent.createChooser(shareIntent, "Share File Using!"));
+        }
         });
 
 
-        // To detect proprietary beacons, you must add a line like below corresponding to your beacon
-        // type.  Do a web search for "setBeaconLayout" to get the proper expression.
+
+
 
 
 
 
     }
-
-
-    public void startScan(){
-    }
-    public void checkPermision() {
-
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
-            if (this.checkSelfPermission(Manifest.permission.ACCESS_FINE_LOCATION)
-                    == PackageManager.PERMISSION_GRANTED) {
-                if (this.checkSelfPermission(Manifest.permission.ACCESS_BACKGROUND_LOCATION)
-                        != PackageManager.PERMISSION_GRANTED) {
-                    if (this.shouldShowRequestPermissionRationale(Manifest.permission.ACCESS_BACKGROUND_LOCATION)) {
-                        final AlertDialog.Builder builder = new AlertDialog.Builder(this);
-                        builder.setTitle("This app needs background location access");
-                        builder.setMessage("Please grant location access so this app can detect beacons in the background.");
-                        builder.setPositiveButton(android.R.string.ok, null);
-                        builder.setOnDismissListener(new DialogInterface.OnDismissListener() {
-
-                            @TargetApi(23)
-                            @Override
-                            public void onDismiss(DialogInterface dialog) {
-                                requestPermissions(new String[]{Manifest.permission.ACCESS_BACKGROUND_LOCATION},
-                                        PERMISSION_REQUEST_BACKGROUND_LOCATION);
-                            }
-
-                        });
-                        builder.show();
-                    } else {
-                        final AlertDialog.Builder builder = new AlertDialog.Builder(this);
-                        builder.setTitle("Functionality limited");
-                        builder.setMessage("Since background location access has not been granted, this app will not be able to discover beacons in the background.  Please go to Settings -> Applications -> Permissions and grant background location access to this app.");
-                        builder.setPositiveButton(android.R.string.ok, null);
-                        builder.setOnDismissListener(new DialogInterface.OnDismissListener() {
-
-                            @Override
-                            public void onDismiss(DialogInterface dialog) {
-                            }
-
-                        });
-                        builder.show();
-                    }
+      public void countDown (){
+             countDownTimer = new CountDownTimer(30000, 1000) {
+                public void onTick(long millisUntilFinished) {
+                    Timer.setText(String.valueOf(counter));
+                    counter++;
 
                 }
-            } else {
-                if (this.shouldShowRequestPermissionRationale(Manifest.permission.ACCESS_FINE_LOCATION)) {
-                    requestPermissions(new String[]{Manifest.permission.ACCESS_FINE_LOCATION,
-                                    Manifest.permission.ACCESS_BACKGROUND_LOCATION},
-                            PERMISSION_REQUEST_FINE_LOCATION);
-                } else {
-                    final AlertDialog.Builder builder = new AlertDialog.Builder(this);
-                    builder.setTitle("Functionality limited");
-                    builder.setMessage("Since location access has not been granted, this app will not be able to discover beacons.  Please go to Settings -> Applications -> Permissions and grant location access to this app.");
-                    builder.setPositiveButton(android.R.string.ok, null);
-                    builder.setOnDismissListener(new DialogInterface.OnDismissListener() {
+                public void onFinish() {
+                    Timer.setText("30 Seconds");
+                    counter = 0;
+                    start.setText("calculate RSSI on  " + expermintSteps[steps] + " meter");
 
-                        @Override
-                        public void onDismiss(DialogInterface dialog) {
-                        }
-
-                    });
-                    builder.show();
                 }
+            }.start();
 
-            }
 
 
-        }
 
     }
+//
 
 
     @Override
     public void onBeaconReadingsUpdate(Map<String, List<BeaconReading>> outputuidRssi) {
-        final File file = new File("/sdcard/Download/", "config.csv");
+        readingsArray[steps] = new int[]{outputuidRssi.get("avgBeacon").get(0).getRssi(), outputuidRssi.get("minBeacon").get(0).getRssi(), outputuidRssi.get("maxBeacon").get(0).getRssi()};
 
-        // Save your stream, don't forget to flush() it before closing it.
-        System.out.println("data"+outputuidRssi.get("maxBeacon").get(0));
-        Log.d("the Main","data"+outputuidRssi.get("maxBeacon").get(0) );
-        try
-        {
+        item = currentTime + "," + expermintSteps[steps] + "," + outputuidRssi.get("avgBeacon").get(0).getUuid() + "," + outputuidRssi.get("avgBeacon").get(0).getRssi() + "," + outputuidRssi.get("minBeacon").get(0).getRssi() + "," + outputuidRssi.get("maxBeacon").get(0).getRssi();
+        data.add(item);
+        adapter.notifyDataSetChanged();
+        System.out.println(item);
+        beaconReadingsProvider.stopUpdating();
+        start.setEnabled(true);
+
+    }
+
+
+    private void writeLog() {
+        Date c = Calendar.getInstance().getTime();
+        System.out.println("Current time => " + c);
+
+        SimpleDateFormat df = new SimpleDateFormat("dd_MMM_yyyy", Locale.getDefault());
+        String formattedDate = df.format(c);
+        System.out.println(formattedDate);
+
+        try {
             file.createNewFile();
             FileOutputStream fOut = new FileOutputStream(file);
             OutputStreamWriter myOutWriter = new OutputStreamWriter(fOut);
-            myOutWriter.append("data"+outputuidRssi.get("maxBeacon").get(0));
+            System.out.println("write to log ");
+            myOutWriter.write(" time ,distance,uuid, avg,min, max");
+            myOutWriter.append("\n");
+            for (String item : data
+            ) {
+                myOutWriter.append(item);
+                myOutWriter.append("\n");
 
+            }
             myOutWriter.close();
 
             fOut.flush();
             fOut.close();
-        }
-        catch (IOException e)
-        {
+        } catch (IOException e) {
             Log.e("Exception", "File write failed: " + e.toString());
-        e.printStackTrace();
+            e.printStackTrace();
         }
     }
 }

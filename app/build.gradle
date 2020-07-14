@@ -34,4 +34,5 @@ dependencies {
     implementation 'org.altbeacon:android-beacon-library:2.12.4'
     implementation 'androidx.localbroadcastmanager:localbroadcastmanager:1.0.0'
     implementation 'com.opencsv:opencsv:4.6'
+    implementation 'androidx.recyclerview:recyclerview:1.1.0'
 }
