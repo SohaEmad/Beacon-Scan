@@ -1,6 +1,6 @@
 package com.example.beaconscan;
 
-import com.opencsv.CSVWriter;
+//import com.opencsv.CSVWriter;
 
 import java.io.File;
 import java.io.FileWriter;
@@ -23,14 +23,14 @@ public class recordLog {
         final String filename = folder.toString() + "/" + "Test.csv";
 
 
-        try {
-            CSVWriter writer = new CSVWriter(new FileWriter(filename));
-            writer.writeAll(data);
-            writer.close();
-        } catch (IOException e) {
-            e.printStackTrace();
-
-        }
+//        try {
+////            CSVWriter writer = new CSVWriter(new FileWriter(filename));
+////            writer.writeAll(data);
+////            writer.close();
+//        } catch (IOException e) {
+//            e.printStackTrace();
+//
+//        }
 
     }
 }
